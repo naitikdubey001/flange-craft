@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag, Trash2, ArrowRight, ArrowLeft, ShieldCheck, Info } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { SEO } from '../components/SEO';
+import { applyImageFallbackOnError } from '../utils/imageFallback';
 
 export function CartPage() {
   const {
@@ -95,7 +96,12 @@ export function CartPage() {
                     to={`/product/${product.slug}`}
                     className="w-24 h-24 rounded-xl overflow-hidden bg-[#1A1C22] border border-white/10 shrink-0"
                   >
-                    <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+                    <img
+                      src={product.images[0]}
+                      alt={product.name}
+                      onError={(e) => applyImageFallbackOnError(e, product.shortName || product.name, product.shape)}
+                      className="w-full h-full object-cover"
+                    />
                   </Link>
 
                   <div className="flex-1 min-w-0 space-y-1.5">

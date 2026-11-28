@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, User, ShoppingBag, Menu, X, ChevronDown, ArrowUpRight, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../context/StoreContext';
+import { applyImageFallbackOnError } from '../utils/imageFallback';
 
 export function Navbar() {
   const { cartCount, user, products, formatPrice } = useStore();
@@ -406,6 +407,7 @@ export function Navbar() {
                       <img
                         src={p.images[0]}
                         alt={p.name}
+                        onError={(e) => applyImageFallbackOnError(e, p.shortName || p.name, p.shape)}
                         className="w-14 h-14 rounded-lg object-cover bg-[#1A1C22] border border-white/10 shrink-0"
                       />
                       <div className="flex-1 min-w-0">

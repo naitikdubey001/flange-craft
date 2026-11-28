@@ -18,6 +18,7 @@ import { useStore } from '../context/StoreContext';
 import { LightboxModal } from '../components/LightboxModal';
 import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
+import { applyImageFallbackOnError } from '../utils/imageFallback';
 
 export function ProductDetailPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -167,6 +168,7 @@ export function ProductDetailPage() {
               <img
                 src={product.images[activeImageIndex] || product.images[0]}
                 alt={`${product.name} view ${activeImageIndex + 1}`}
+                onError={(e) => applyImageFallbackOnError(e, product.shortName, product.shape)}
                 style={
                   isZoomed
                     ? {
@@ -222,7 +224,12 @@ export function ProductDetailPage() {
                       : 'border-white/10 opacity-60 hover:opacity-100'
                   }`}
                 >
-                  <img src={img} alt={`${product.shortName} thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                  <img
+                    src={img}
+                    alt={`${product.shortName} thumbnail ${idx + 1}`}
+                    onError={(e) => applyImageFallbackOnError(e, product.shortName, product.shape)}
+                    className="w-full h-full object-cover"
+                  />
                 </button>
               ))}
             </div>

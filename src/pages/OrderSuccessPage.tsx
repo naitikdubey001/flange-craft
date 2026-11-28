@@ -1,37 +1,56 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useLocation, Link } from 'react-router-dom';
 import { CheckCircle2, Clock, ShieldCheck, ArrowRight, Package, AlertTriangle } from 'lucide-react';
 import { Order } from '../types';
 import { useStore } from '../context/StoreContext';
 import { SEO } from '../components/SEO';
+import { apiRequest, getErrorMessage } from '../utils/api';
+import { applyImageFallbackOnError } from '../utils/imageFallback';
 
 export function OrderSuccessPage() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const orderNumber = searchParams.get('order');
-  const { formatPrice } = useStore();
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { formatPrice, token } = useStore();
+
+  const initialStateOrder = (location.state as { order?: Order } | null)?.order;
+  const [order, setOrder] = useState<Order | null>(
+    initialStateOrder && (!orderNumber || initialStateOrder.orderNumber === orderNumber)
+      ? initialStateOrder
+      : null
+  );
+  const [loading, setLoading] = useState(!order);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadOrder() {
       if (!orderNumber) {
+        setOrder(null);
         setLoading(false);
         return;
       }
+      if (initialStateOrder && initialStateOrder.orderNumber.toUpperCase() === orderNumber.trim().toUpperCase()) {
+        setOrder(initialStateOrder);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setErrorMsg(null);
       try {
-        const res = await fetch(`/api/orders/${encodeURIComponent(orderNumber)}`);
-        if (res.ok) {
-          const data = await res.json();
-          setOrder(data.order);
-        }
-      } catch {
-        // ignore
+        const { data } = await apiRequest<{ order?: Order }>(
+          `/api/orders/${encodeURIComponent(orderNumber.trim())}`,
+          { token }
+        );
+        setOrder(data.order || null);
+      } catch (err) {
+        setOrder(null);
+        setErrorMsg(getErrorMessage(err, 'We could not locate the requested order confirmation.'));
       } finally {
         setLoading(false);
       }
     }
     loadOrder();
-  }, [orderNumber]);
+  }, [orderNumber, token, initialStateOrder]);
 
   if (loading) {
     return (
@@ -47,7 +66,8 @@ export function OrderSuccessPage() {
         <div className="max-w-lg mx-auto rounded-3xl bg-[#111318] border border-white/10 p-12 space-y-5">
           <h1 className="font-display text-2xl font-bold text-[#F5F5F7]">Order Not Found</h1>
           <p className="text-sm text-[#A1A1AA]">
-            We could not locate the requested order confirmation. You can view all your orders in your Customer Account.
+            {errorMsg ||
+              'We could not locate the requested order confirmation. You can view all your orders in your Customer Account.'}
           </p>
           <Link
             to="/products"
@@ -153,6 +173,7 @@ export function OrderSuccessPage() {
                   <img
                     src={item.image}
                     alt={item.name}
+                    onError={(e) => applyImageFallbackOnError(e, item.shortName || item.name, item.shape)}
                     className="w-16 h-16 rounded-xl object-cover bg-[#1A1C22] border border-white/10 shrink-0"
                   />
                   <div className="flex-1 min-w-0">
@@ -180,21 +201,40 @@ export function OrderSuccessPage() {
 
             <div className="space-y-3 text-xs sm:text-sm">
               <div>
-                <span className="text-[#A1A1AA] block text-xs">Customer Name</span>
+                <span className="text-[#A1A1AA] block text-xs">Customer</span>
                 <span className="font-semibold text-[#F5F5F7]">{order.customerName}</span>
               </div>
               <div>
-                <span className="text-[#A1A1AA] block text-xs">Email &amp; Phone</span>
+                <span className="text-[#A1A1AA] block text-xs">Contact</span>
                 <span className="text-[#F5F5F7]">
-                  {order.customerEmail} • {order.customerPhone}
+                  {order.customerEmail}
+                  {order.customerPhone ? ` • ${order.customerPhone}` : ''}
                 </span>
               </div>
               <div>
-                <span className="text-[#A1A1AA] block text-xs">Shipping Address</span>
+                <span className="text-[#A1A1AA] block text-xs">Delivery Destination</span>
                 <span className="text-[#F5F5F7] leading-relaxed block">
-                  {order.shippingAddress.address}, {order.shippingAddress.city}, {order.shippingAddress.state}{' '}
-                  {order.shippingAddress.postalCode}, {order.shippingAddress.country}
+                  {[
+                    order.shippingAddress?.address,
+                    order.shippingAddress?.city,
+                    order.shippingAddress?.state,
+                    order.shippingAddress?.postalCode,
+                    order.shippingAddress?.country
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}
                 </span>
+              </div>
+              <div>
+                <span className="text-[#A1A1AA] block text-xs">Shipping Status</span>
+                <span className="text-[#F5F5F7] capitalize font-semibold">
+                  {order.shippingStatus.replace(/_/g, ' ')}
+                </span>
+                {order.trackingNumber && (
+                  <span className="block text-xs text-[#38BDF8] mt-0.5">
+                    Tracking: {order.trackingCarrier} {order.trackingNumber}
+                  </span>
+                )}
               </div>
             </div>
 

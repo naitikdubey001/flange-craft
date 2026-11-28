@@ -11,7 +11,10 @@ import {
   FileText
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
+import { Order } from '../types';
 import { SEO } from '../components/SEO';
+import { apiRequest, getErrorMessage } from '../utils/api';
+import { applyImageFallbackOnError } from '../utils/imageFallback';
 
 declare global {
   interface Window {
@@ -46,8 +49,16 @@ export function CheckoutPage() {
   const [postalCode, setPostalCode] = useState('');
   const [country, setCountry] = useState('India');
   const [notes, setNotes] = useState('');
+  const isOnlineGatewayActive = Boolean(
+    paymentGatewayStatus.liveCredentialsConfigured ||
+      paymentGatewayStatus.onlinePaymentsEnabled ||
+      paymentGatewayStatus.mode === 'live' ||
+      paymentGatewayStatus.mode === 'live_razorpay' ||
+      paymentGatewayStatus.mode === 'test_sandbox'
+  );
+
   const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'configurable_quote'>(
-    hasUnconfiguredCartPrice ? 'configurable_quote' : 'razorpay'
+    hasUnconfiguredCartPrice || !isOnlineGatewayActive ? 'configurable_quote' : 'razorpay'
   );
 
   const [submitting, setSubmitting] = useState(false);
@@ -80,8 +91,8 @@ export function CheckoutPage() {
   }, [user]);
 
   useEffect(() => {
-    setPaymentMethod(hasUnconfiguredCartPrice ? 'configurable_quote' : 'razorpay');
-  }, [hasUnconfiguredCartPrice]);
+    setPaymentMethod(hasUnconfiguredCartPrice || !isOnlineGatewayActive ? 'configurable_quote' : 'razorpay');
+  }, [hasUnconfiguredCartPrice, isOnlineGatewayActive]);
 
   const shippingFee = hasUnconfiguredCartPrice ? 0 : Number(siteConfig?.commerce?.shippingFee || 0);
   const taxPct = Number(siteConfig?.commerce?.taxPercentage || 0);
@@ -128,16 +139,17 @@ export function CheckoutPage() {
   ) => {
     setVerifyingPayment(true);
     try {
-      const verifyRes = await fetch('/api/payments/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: orderNumber,
-          ...payload
-        })
-      });
-      const verifyData = await verifyRes.json();
-      if (!verifyRes.ok || !verifyData.verified) {
+      const { data: verifyData } = await apiRequest<{ verified?: boolean; order?: Order; error?: string }>(
+        '/api/payments/verify',
+        {
+          method: 'POST',
+          body: {
+            orderId: orderNumber,
+            ...payload
+          }
+        }
+      );
+      if (!verifyData.verified) {
         setError(verifyData.error || 'Payment verification failed. Order was not marked as paid.');
         setTestGatewayModal(null);
         showToast('Payment Verification Failed', verifyData.error || 'Signature mismatch', 'error');
@@ -146,9 +158,14 @@ export function CheckoutPage() {
       clearCart();
       setTestGatewayModal(null);
       showToast('Payment Verified', `Order ${orderNumber} cryptographically verified.`);
-      navigate(`/checkout/success?order=${encodeURIComponent(orderNumber)}`);
-    } catch {
-      setError('Server error while verifying payment.');
+      navigate(`/checkout/success?order=${encodeURIComponent(orderNumber)}`, {
+        state: { order: verifyData.order }
+      });
+    } catch (err) {
+      const msg = getErrorMessage(err, 'Payment verification failed. Order was not marked as paid.');
+      setError(msg);
+      setTestGatewayModal(null);
+      showToast('Payment Verification Failed', msg, 'error');
     } finally {
       setVerifyingPayment(false);
     }
@@ -165,13 +182,19 @@ export function CheckoutPage() {
 
     setSubmitting(true);
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers.Authorization = `Bearer ${token}`;
-
-      const res = await fetch('/api/orders/create', {
+      const { data } = await apiRequest<{
+        order: Order;
+        razorpay: {
+          orderId: string;
+          amountPaise: number;
+          currency: string;
+          keyId: string;
+          mode: string;
+        } | null;
+      }>('/api/orders/create', {
         method: 'POST',
-        headers,
-        body: JSON.stringify({
+        token,
+        body: {
           customer: {
             name: fullName.trim(),
             email: email.trim(),
@@ -194,15 +217,8 @@ export function CheckoutPage() {
           })),
           paymentMethod,
           notes: notes.trim()
-        })
+        }
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Unable to create order.');
-        setSubmitting(false);
-        return;
-      }
 
       const createdOrder = data.order;
       const rpDetails = data.razorpay;
@@ -210,7 +226,9 @@ export function CheckoutPage() {
       // Case 1: Configurable Price Order (price pending admin quote)
       if (createdOrder.hasUnconfiguredPrice || !rpDetails) {
         clearCart();
-        navigate(`/checkout/success?order=${encodeURIComponent(createdOrder.orderNumber)}`);
+        navigate(`/checkout/success?order=${encodeURIComponent(createdOrder.orderNumber)}`, {
+          state: { order: createdOrder }
+        });
         return;
       }
 
@@ -252,8 +270,8 @@ export function CheckoutPage() {
         amountPaise: rpDetails.amountPaise,
         customerName: fullName.trim()
       });
-    } catch {
-      setError('Network error while creating order.');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to create order. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -263,22 +281,24 @@ export function CheckoutPage() {
     if (!testGatewayModal) return;
     setVerifyingPayment(true);
     try {
-      const sigRes = await fetch('/api/payments/create-test-signature', {
+      const { data: sigData } = await apiRequest<{
+        razorpayOrderId: string;
+        razorpayPaymentId: string;
+        razorpaySignature: string;
+      }>('/api/payments/create-test-signature', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           razorpayOrderId: testGatewayModal.razorpayOrderId,
           outcome
-        })
+        }
       });
-      const sigData = await sigRes.json();
       await verifyPaymentOnServer(testGatewayModal.orderNumber, {
         razorpay_order_id: sigData.razorpayOrderId,
         razorpay_payment_id: sigData.razorpayPaymentId,
         razorpay_signature: sigData.razorpaySignature
       });
-    } catch {
-      setError('Failed to execute test payment verification.');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to execute test payment verification.'));
       setVerifyingPayment(false);
     }
   };
@@ -488,20 +508,26 @@ export function CheckoutPage() {
                     <CreditCard className="w-5 h-5 text-[#8B5CF6] shrink-0 mt-0.5" />
                     <div className="space-y-1">
                       <div className="text-sm font-semibold text-[#F5F5F7] flex items-center gap-2">
-                        Razorpay Secure Payment Gateway (INR)
+                        Razorpay Payment Gateway (INR)
                         <span className="px-2 py-0.5 rounded bg-[#8B5CF6]/20 text-[10px] text-[#38BDF8]">
-                          {paymentGatewayStatus.liveCredentialsConfigured ? 'Live Mode' : 'Development/Test Mode'}
+                          {paymentGatewayStatus.liveCredentialsConfigured
+                            ? 'Live Mode'
+                            : isOnlineGatewayActive
+                            ? 'Sandbox Test Mode'
+                            : 'Not Configured'}
                         </span>
                       </div>
                       <p className="text-xs text-[#A1A1AA] leading-relaxed">
-                        Creates a backend payment order and verifies transaction authenticity using server-side HMAC-SHA256 signature verification and duplicate transaction protection.
+                        {isOnlineGatewayActive
+                          ? 'Creates a backend payment order and verifies transaction authenticity using server-side HMAC-SHA256 signature verification and duplicate transaction protection.'
+                          : 'Online payment gateway onboarding is not yet active. Submitting your order records your verified signage selection in the database with payment pending manual confirmation by Sunil Shukla and Team.'}
                       </p>
                     </div>
                   </div>
 
-                  {!paymentGatewayStatus.liveCredentialsConfigured && (
+                  {!isOnlineGatewayActive && (
                     <div className="p-3.5 rounded-xl bg-[#08090B] border border-white/10 text-xs text-[#A1A1AA] leading-relaxed">
-                      <strong className="text-[#38BDF8]">Configuration Notice:</strong> Live Razorpay keys (<code className="text-[#F5F5F7]">RAZORPAY_KEY_ID</code> &amp; <code className="text-[#F5F5F7]">RAZORPAY_KEY_SECRET</code>) are not set in environment variables. Clicking "Pay &amp; Verify Order" will launch the Development/Test Mode Razorpay Verification flow with real backend HMAC-SHA256 cryptographic signature verification.
+                      <strong className="text-[#38BDF8]">Payment Gateway Notice:</strong> Live Razorpay merchant credentials are not configured. Online card/UPI capture is disabled, and your order will be registered as <strong className="text-[#F5F5F7]">Payment Pending / Unverified</strong> for manual invoice coordination.
                     </div>
                   )}
                 </div>
@@ -543,6 +569,7 @@ export function CheckoutPage() {
                     <img
                       src={product.images[0]}
                       alt={product.name}
+                      onError={(e) => applyImageFallbackOnError(e, product.shortName, product.shape)}
                       className="w-14 h-14 rounded-xl object-cover bg-[#1A1C22] border border-white/10 shrink-0"
                     />
                     <div className="flex-1 min-w-0">
@@ -601,6 +628,8 @@ export function CheckoutPage() {
                   ? 'Processing Order...'
                   : hasUnconfiguredCartPrice
                   ? 'Submit Order for Price Confirmation'
+                  : !isOnlineGatewayActive
+                  ? `Submit Order (${formatPrice(totalAmount, true)} — Payment Pending)`
                   : `Pay & Verify Order (${formatPrice(totalAmount, true)})`}
               </button>
 

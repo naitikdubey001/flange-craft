@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, ArrowUpRight, RotateCw, Layers } from 'lucide-react';
 import { Product } from '../types';
 import { useStore } from '../context/StoreContext';
+import { createSignagePlaceholderDataUri } from '../utils/imageFallback';
 
 interface ProductCardProps {
   product: Product;
@@ -11,6 +12,15 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   const { addToCart, formatPrice } = useStore();
   const isRotating = product.category === 'rotating';
+  const primaryImage = product.images && product.images.length > 0 ? product.images[0] : '';
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [primaryImage]);
+
+  const fallbackSrc = createSignagePlaceholderDataUri(product.shortName || product.name, product.shape);
+  const displaySrc = !primaryImage || imageError ? fallbackSrc : primaryImage;
 
   return (
     <div className="group rounded-2xl bg-[#111318] border border-white/[0.08] hover:border-white/20 overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1 shadow-xl shadow-black/40">
@@ -20,9 +30,14 @@ export function ProductCard({ product }: ProductCardProps) {
         className="relative aspect-square w-full bg-[#1A1C22] overflow-hidden block"
       >
         <img
-          src={product.images[0]}
+          src={displaySrc}
           alt={product.name}
           loading="lazy"
+          onError={() => {
+            if (!imageError) {
+              setImageError(true);
+            }
+          }}
           className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#08090B]/80 via-transparent to-black/20 opacity-75 group-hover:opacity-60 transition-opacity" />

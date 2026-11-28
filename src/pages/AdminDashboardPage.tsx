@@ -17,6 +17,8 @@ import {
 import { useStore } from '../context/StoreContext';
 import { Product, Order, User, SiteConfig, FaqItem, Inquiry } from '../types';
 import { SEO } from '../components/SEO';
+import { apiRequest, ApiError, getErrorMessage } from '../utils/api';
+import { applyImageFallbackOnError } from '../utils/imageFallback';
 
 interface AdminStats {
   totalOrders: number;
@@ -29,12 +31,25 @@ interface AdminStats {
   newInquiries: number;
 }
 
+interface AdminOverviewResponse {
+  stats: AdminStats;
+  products: Product[];
+  orders: Order[];
+  customers: User[];
+  inquiries: Inquiry[];
+  faqs: FaqItem[];
+  siteConfig: SiteConfig;
+}
+
 export function AdminDashboardPage() {
   const { user, token, setAuthSession, refreshStoreData, showToast, formatPrice } = useStore();
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'customers' | 'content'>('dashboard');
   const [loading, setLoading] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
 
   // Admin Login Gate state if not authenticated as admin
   const [adminEmail, setAdminEmail] = useState('');
@@ -81,27 +96,25 @@ export function AdminDashboardPage() {
     if (!token) return;
     setLoading(true);
     setAuthError(null);
+    setDashboardError(null);
     try {
-      const res = await fetch('/api/admin/overview', {
-        headers: { Authorization: `Bearer ${token}` }
+      const { data } = await apiRequest<AdminOverviewResponse>('/api/admin/overview', {
+        token
       });
-      if (res.status === 401 || res.status === 403) {
+      setStats(data.stats);
+      setProducts(data.products || []);
+      setOrders(data.orders || []);
+      setCustomers(data.customers || []);
+      setInquiries(data.inquiries || []);
+      setFaqs(data.faqs || []);
+      setConfigDraft(data.siteConfig || null);
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         setAuthError('Backend Authorization Denied: Administrator privileges required.');
-        setLoading(false);
-        return;
+      } else {
+        const msg = getErrorMessage(err, 'Unable to load admin overview from backend API.');
+        setDashboardError(msg);
       }
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data.stats);
-        setProducts(data.products || []);
-        setOrders(data.orders || []);
-        setCustomers(data.customers || []);
-        setInquiries(data.inquiries || []);
-        setFaqs(data.faqs || []);
-        setConfigDraft(data.siteConfig || null);
-      }
-    } catch {
-      setAuthError('Unable to reach backend admin API.');
     } finally {
       setLoading(false);
     }
@@ -123,39 +136,46 @@ export function AdminDashboardPage() {
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
+    if (!adminEmail.trim() || !adminPassword) {
+      setAuthError('Please enter both administrator email and password.');
+      return;
+    }
+    setLoginLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
+      const { status, data } = await apiRequest<{ token?: string; user?: User }>('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: adminEmail, password: adminPassword })
+        body: { email: adminEmail.trim(), password: adminPassword }
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setAuthError(data.error || 'Admin login failed.');
+
+      if (status < 200 || status >= 300 || !data?.token || !data?.user) {
+        setAuthError('Invalid authentication response from server.');
         return;
       }
+
       if (data.user.role !== 'admin') {
         setAuthError('This account does not have administrator permissions.');
         return;
       }
+
       setAuthSession(data.token, data.user);
+      setAdminPassword('');
       showToast('Admin Authorized', 'Signed in to Flange Craft Admin Dashboard.');
-    } catch {
-      setAuthError('Network error during admin authentication.');
+    } catch (err) {
+      setAuthError(getErrorMessage(err, 'Admin login failed. Please verify your credentials and backend connection.'));
+    } finally {
+      setLoginLoading(false);
     }
   };
 
   const handlePricingPreset = async (action: 'apply_sample_prices' | 'clear_prices') => {
     if (!token) return;
-    const res = await fetch('/api/admin/pricing-preset', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ action })
-    });
-    if (res.ok) {
+    setActionLoading(true);
+    try {
+      await apiRequest('/api/admin/pricing-preset', {
+        method: 'POST',
+        token,
+        body: { action }
+      });
       await fetchAdminOverview();
       await refreshStoreData();
       showToast(
@@ -164,6 +184,10 @@ export function AdminDashboardPage() {
           ? 'Sample INR prices applied to all 6 variants for checkout & Razorpay testing.'
           : 'All variants set to Configurable Price state.'
       );
+    } catch (err) {
+      showToast('Pricing Update Failed', getErrorMessage(err, 'Unable to update store pricing preset.'), 'error');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -180,75 +204,78 @@ export function AdminDashboardPage() {
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct || !token) return;
-    const res = await fetch(`/api/admin/products/${editingProduct.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        price: editPrice.trim() === '' ? null : Number(editPrice),
-        inventory: Number(editInventory),
-        sku: editSku.trim(),
-        inStock: editInStock,
-        summary: editSummary.trim(),
-        images: editImages
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
-      })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      showToast('Update Error', data.error || 'Failed to update product', 'error');
-      return;
+    setActionLoading(true);
+    try {
+      const { data } = await apiRequest<{ product: Product }>(`/api/admin/products/${editingProduct.id}`, {
+        method: 'PUT',
+        token,
+        body: {
+          price: editPrice.trim() === '' ? null : Number(editPrice),
+          inventory: Number(editInventory),
+          sku: editSku.trim(),
+          inStock: editInStock,
+          summary: editSummary.trim(),
+          images: editImages
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        }
+      });
+      setEditingProduct(null);
+      await fetchAdminOverview();
+      await refreshStoreData();
+      showToast('Product Updated', `${data.product.shortName} saved.`);
+    } catch (err) {
+      showToast('Update Error', getErrorMessage(err, 'Failed to update product.'), 'error');
+    } finally {
+      setActionLoading(false);
     }
-    setEditingProduct(null);
-    await fetchAdminOverview();
-    await refreshStoreData();
-    showToast('Product Updated', `${data.product.shortName} saved.`);
   };
 
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
-    const res = await fetch('/api/admin/products', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        ...newProd,
-        price: newProd.price.trim() === '' ? null : Number(newProd.price),
-        inventory: Number(newProd.inventory),
-        images: newProd.images
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
-      })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      showToast('Validation Error', data.error || 'Could not create product', 'error');
-      return;
+    setActionLoading(true);
+    try {
+      const { data } = await apiRequest<{ product: Product }>('/api/admin/products', {
+        method: 'POST',
+        token,
+        body: {
+          ...newProd,
+          price: newProd.price.trim() === '' ? null : Number(newProd.price),
+          inventory: Number(newProd.inventory),
+          images: newProd.images
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        }
+      });
+      setShowAddProduct(false);
+      await fetchAdminOverview();
+      await refreshStoreData();
+      showToast('Product Added', `${data.product.name} added to catalogue.`);
+    } catch (err) {
+      showToast('Validation Error', getErrorMessage(err, 'Could not create product.'), 'error');
+    } finally {
+      setActionLoading(false);
     }
-    setShowAddProduct(false);
-    await fetchAdminOverview();
-    await refreshStoreData();
-    showToast('Product Added', `${data.product.name} added to catalogue.`);
   };
 
   const handleDeleteProduct = async (id: string, name: string) => {
     if (!token) return;
-    const res = await fetch(`/api/admin/products/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (res.ok) {
+    setActionLoading(true);
+    try {
+      await apiRequest(`/api/admin/products/${id}`, {
+        method: 'DELETE',
+        token
+      });
       await fetchAdminOverview();
       await refreshStoreData();
       showToast('Product Deleted', `${name} removed.`, 'info');
+    } catch (err) {
+      showToast('Delete Failed', getErrorMessage(err, 'Failed to delete product.'), 'error');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -257,35 +284,36 @@ export function AdminDashboardPage() {
     updates: { orderStatus?: string; shippingStatus?: string; trackingNumber?: string; trackingCarrier?: string }
   ) => {
     if (!token) return;
-    const res = await fetch(`/api/admin/orders/${orderId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify(updates)
-    });
-    if (res.ok) {
+    try {
+      await apiRequest(`/api/admin/orders/${orderId}`, {
+        method: 'PUT',
+        token,
+        body: updates
+      });
       await fetchAdminOverview();
       showToast('Order Updated', 'Order status and tracking synchronized.');
+    } catch (err) {
+      showToast('Order Update Error', getErrorMessage(err, 'Unable to update order.'), 'error');
     }
   };
 
   const handleSaveSiteConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !configDraft) return;
-    const res = await fetch('/api/admin/site-config', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ siteConfig: configDraft })
-    });
-    if (res.ok) {
+    setActionLoading(true);
+    try {
+      await apiRequest('/api/admin/site-config', {
+        method: 'PUT',
+        token,
+        body: { siteConfig: configDraft }
+      });
       await fetchAdminOverview();
       await refreshStoreData();
       showToast('Configuration Saved', 'Website content, contact details, and policies updated.');
+    } catch (err) {
+      showToast('Save Failed', getErrorMessage(err, 'Unable to save site configuration.'), 'error');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -318,10 +346,11 @@ export function AdminDashboardPage() {
               <input
                 type="email"
                 required
+                disabled={loginLoading}
                 value={adminEmail}
                 onChange={(e) => setAdminEmail(e.target.value)}
                 placeholder="Enter administrator email"
-                className="w-full px-4 py-3 rounded-xl bg-[#1A1C22] border border-white/10 text-sm text-[#F5F5F7]"
+                className="w-full px-4 py-3 rounded-xl bg-[#1A1C22] border border-white/10 text-sm text-[#F5F5F7] disabled:opacity-60"
               />
             </div>
             <div>
@@ -329,18 +358,20 @@ export function AdminDashboardPage() {
               <input
                 type="password"
                 required
+                disabled={loginLoading}
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
                 placeholder="Enter admin password"
-                className="w-full px-4 py-3 rounded-xl bg-[#1A1C22] border border-white/10 text-sm text-[#F5F5F7]"
+                className="w-full px-4 py-3 rounded-xl bg-[#1A1C22] border border-white/10 text-sm text-[#F5F5F7] disabled:opacity-60"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full py-3.5 px-6 rounded-xl bg-[#F5F5F7] hover:bg-white text-[#08090B] font-display text-xs font-bold"
+              disabled={loginLoading}
+              className="w-full py-3.5 px-6 rounded-xl bg-[#F5F5F7] hover:bg-white disabled:opacity-50 text-[#08090B] font-display text-xs font-bold transition-all"
             >
-              Authenticate Administrator
+              {loginLoading ? 'Authenticating...' : 'Authenticate Administrator'}
             </button>
           </form>
         </div>
@@ -384,13 +415,21 @@ export function AdminDashboardPage() {
 
           <button
             type="button"
+            disabled={loading}
             onClick={fetchAdminOverview}
-            className="px-4 py-2.5 rounded-xl bg-[#111318] hover:bg-[#1A1C22] border border-white/10 text-xs font-semibold text-[#F5F5F7] inline-flex items-center gap-2"
+            className="px-4 py-2.5 rounded-xl bg-[#111318] hover:bg-[#1A1C22] disabled:opacity-50 border border-white/10 text-xs font-semibold text-[#F5F5F7] inline-flex items-center gap-2"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-[#38BDF8] ${loading ? 'animate-spin' : ''}`} />
-            Refresh Data
+            {loading ? 'Refreshing...' : 'Refresh Data'}
           </button>
         </div>
+
+        {(authError || dashboardError) && (
+          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{authError || dashboardError}</span>
+          </div>
+        )}
 
         {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-2">
@@ -468,15 +507,17 @@ export function AdminDashboardPage() {
               <div className="flex flex-wrap gap-3 shrink-0">
                 <button
                   type="button"
+                  disabled={actionLoading}
                   onClick={() => handlePricingPreset('apply_sample_prices')}
-                  className="px-5 py-3 rounded-xl bg-[#F5F5F7] hover:bg-white text-[#08090B] text-xs font-bold transition-colors"
+                  className="px-5 py-3 rounded-xl bg-[#F5F5F7] hover:bg-white disabled:opacity-50 text-[#08090B] text-xs font-bold transition-colors"
                 >
                   Enable Sample Store Prices (INR)
                 </button>
                 <button
                   type="button"
+                  disabled={actionLoading}
                   onClick={() => handlePricingPreset('clear_prices')}
-                  className="px-5 py-3 rounded-xl bg-[#1A1C22] hover:bg-[#242832] border border-white/15 text-xs font-semibold text-[#F5F5F7] transition-colors"
+                  className="px-5 py-3 rounded-xl bg-[#1A1C22] hover:bg-[#242832] disabled:opacity-50 border border-white/15 text-xs font-semibold text-[#F5F5F7] transition-colors"
                 >
                   Reset to Unconfigured Price State
                 </button>
@@ -601,6 +642,7 @@ export function AdminDashboardPage() {
                   />
                   <input
                     type="number"
+                    min="0"
                     placeholder="Price in INR (Leave blank for Configurable)"
                     value={newProd.price}
                     onChange={(e) => setNewProd({ ...newProd, price: e.target.value })}
@@ -608,6 +650,7 @@ export function AdminDashboardPage() {
                   />
                   <input
                     type="number"
+                    min="0"
                     placeholder="Inventory Qty"
                     value={newProd.inventory}
                     onChange={(e) => setNewProd({ ...newProd, inventory: e.target.value })}
@@ -617,9 +660,10 @@ export function AdminDashboardPage() {
                 <div className="flex gap-2">
                   <button
                     type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-[#F5F5F7] text-[#08090B] text-xs font-bold"
+                    disabled={actionLoading}
+                    className="px-5 py-2.5 rounded-xl bg-[#F5F5F7] disabled:opacity-50 text-[#08090B] text-xs font-bold"
                   >
-                    Create Variant
+                    {actionLoading ? 'Creating...' : 'Create Variant'}
                   </button>
                   <button
                     type="button"
@@ -657,6 +701,7 @@ export function AdminDashboardPage() {
                     </label>
                     <input
                       type="number"
+                      min="0"
                       value={editPrice}
                       onChange={(e) => setEditPrice(e.target.value)}
                       placeholder="Configurable (null)"
@@ -667,6 +712,7 @@ export function AdminDashboardPage() {
                     <label className="block text-[11px] text-[#A1A1AA] mb-1">Inventory Stock</label>
                     <input
                       type="number"
+                      min="0"
                       value={editInventory}
                       onChange={(e) => setEditInventory(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[#1A1C22] border border-white/10 text-xs text-[#F5F5F7]"
@@ -717,9 +763,10 @@ export function AdminDashboardPage() {
 
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-[#38BDF8] text-[#08090B] text-xs font-bold"
+                  disabled={actionLoading}
+                  className="px-6 py-2.5 rounded-xl bg-[#38BDF8] disabled:opacity-50 text-[#08090B] text-xs font-bold"
                 >
-                  Save Product Changes
+                  {actionLoading ? 'Saving...' : 'Save Product Changes'}
                 </button>
               </form>
             )}
@@ -733,6 +780,7 @@ export function AdminDashboardPage() {
                   <img
                     src={p.images[0]}
                     alt={p.name}
+                    onError={(e) => applyImageFallbackOnError(e, p.shortName, p.shape)}
                     className="w-20 h-20 rounded-xl object-cover bg-[#1A1C22] border border-white/10 shrink-0"
                   />
                   <div className="flex-1 min-w-0 space-y-1">
@@ -759,8 +807,9 @@ export function AdminDashboardPage() {
                     </button>
                     <button
                       type="button"
+                      disabled={actionLoading}
                       onClick={() => handleDeleteProduct(p.id, p.shortName)}
-                      className="p-2 rounded-lg bg-[#1A1C22] hover:bg-red-500/20 border border-white/10 text-red-400"
+                      className="p-2 rounded-lg bg-[#1A1C22] hover:bg-red-500/20 disabled:opacity-50 border border-white/10 text-red-400"
                       title="Delete Product"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1050,6 +1099,7 @@ export function AdminDashboardPage() {
                   <label className="block text-xs text-[#A1A1AA] mb-1">Shipping Fee (INR)</label>
                   <input
                     type="number"
+                    min="0"
                     value={configDraft.commerce.shippingFee}
                     onChange={(e) =>
                       setConfigDraft({
@@ -1129,9 +1179,10 @@ export function AdminDashboardPage() {
 
             <button
               type="submit"
-              className="px-8 py-4 rounded-xl bg-[#F5F5F7] hover:bg-white text-[#08090B] font-display text-sm font-bold"
+              disabled={actionLoading}
+              className="px-8 py-4 rounded-xl bg-[#F5F5F7] hover:bg-white disabled:opacity-50 text-[#08090B] font-display text-sm font-bold"
             >
-              Save All Content &amp; Policy Configurations
+              {actionLoading ? 'Saving Configuration...' : 'Save All Content & Policy Configurations'}
             </button>
           </form>
         )}

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Product, CartItem, User, SiteConfig, FaqItem } from '../types';
+import { apiRequest, ApiError } from '../utils/api';
 
 const FALLBACK_PRODUCTS: Product[] = [
   {
@@ -310,6 +311,7 @@ interface StoreContextValue {
   faqs: FaqItem[];
   paymentGatewayStatus: {
     liveCredentialsConfigured: boolean;
+    onlinePaymentsEnabled?: boolean;
     keyId: string;
     mode: string;
   };
@@ -343,8 +345,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
   const [paymentGatewayStatus, setPaymentGatewayStatus] = useState({
     liveCredentialsConfigured: false,
+    onlinePaymentsEnabled: false,
     keyId: '',
-    mode: 'development_test'
+    mode: 'disabled'
   });
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<ToastNotification | null>(null);
@@ -371,24 +374,42 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const refreshStoreData = useCallback(async () => {
     try {
-      const res = await fetch('/api/bootstrap');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.products) && data.products.length > 0) {
-          setProducts(data.products);
-          // Sync cart items with latest product price/stock from DB
-          setCart((prevCart) =>
-            prevCart
-              .map((item) => {
-                const updatedProd = data.products.find((p: Product) => p.id === item.product.id || p.slug === item.product.slug);
-                return updatedProd ? { ...item, product: updatedProd } : item;
-              })
-              .filter((item) => Boolean(item.product))
-          );
-        }
-        if (data.siteConfig) setSiteConfig(data.siteConfig);
-        if (Array.isArray(data.faqs)) setFaqs(data.faqs);
-        if (data.paymentGatewayStatus) setPaymentGatewayStatus(data.paymentGatewayStatus);
+      const { data } = await apiRequest<{
+        products?: Product[];
+        siteConfig?: SiteConfig;
+        faqs?: FaqItem[];
+        paymentGatewayStatus?: {
+          liveCredentialsConfigured: boolean;
+          onlinePaymentsEnabled?: boolean;
+          keyId: string;
+          mode: string;
+        };
+      }>('/api/bootstrap');
+      if (Array.isArray(data.products) && data.products.length > 0) {
+        setProducts(data.products);
+        // Sync cart items with latest product price/stock from DB
+        setCart((prevCart) =>
+          prevCart
+            .map((item) => {
+              const updatedProd = data.products!.find(
+                (p: Product) => p.id === item.product.id || p.slug === item.product.slug
+              );
+              return updatedProd ? { ...item, product: updatedProd } : item;
+            })
+            .filter((item) => Boolean(item.product))
+        );
+      }
+      if (data.siteConfig) setSiteConfig(data.siteConfig);
+      if (Array.isArray(data.faqs)) setFaqs(data.faqs);
+      if (data.paymentGatewayStatus) {
+        setPaymentGatewayStatus({
+          liveCredentialsConfigured: Boolean(data.paymentGatewayStatus.liveCredentialsConfigured),
+          onlinePaymentsEnabled: Boolean(
+            data.paymentGatewayStatus.onlinePaymentsEnabled ?? data.paymentGatewayStatus.liveCredentialsConfigured
+          ),
+          keyId: data.paymentGatewayStatus.keyId || '',
+          mode: data.paymentGatewayStatus.mode || 'disabled'
+        });
       }
     } catch (err) {
       console.error('Bootstrap fetch error:', err);
@@ -416,19 +437,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const res = await fetch('/api/auth/me', {
-          headers: { Authorization: `Bearer ${token}` }
+        const { data } = await apiRequest<{ user?: User }>('/api/auth/me', {
+          token
         });
-        if (res.ok) {
-          const data = await res.json();
+        if (data?.user) {
           setUser(data.user);
         } else {
           localStorage.removeItem(AUTH_TOKEN_KEY);
           setToken(null);
           setUser(null);
         }
-      } catch {
-        // server unreachable
+      } catch (err) {
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          localStorage.removeItem(AUTH_TOKEN_KEY);
+          setToken(null);
+          setUser(null);
+        }
       }
     }
     verifySession();
@@ -443,12 +467,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     if (token) {
       try {
-        await fetch('/api/auth/logout', {
+        await apiRequest('/api/auth/logout', {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
+          token
         });
       } catch {
-        // ignore
+        // ignore network errors during logout
       }
     }
     localStorage.removeItem(AUTH_TOKEN_KEY);

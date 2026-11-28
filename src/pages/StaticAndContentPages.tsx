@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { SEO } from '../components/SEO';
+import { apiRequest, getErrorMessage } from '../utils/api';
 
 // --- 1. ABOUT US PAGE (/about) ---
 export function AboutPage() {
@@ -235,31 +236,25 @@ export function ContactPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/contact', {
+      const { data } = await apiRequest<{ success?: boolean; inquiryId?: string }>('/api/contact', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           name: name.trim(),
           email: email.trim(),
           phone: phone.trim(),
           subject: subject.trim(),
           message: message.trim()
-        })
+        }
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed to submit inquiry.');
-      } else {
-        setSubmittedId(data.inquiryId);
-        showToast('Inquiry Sent', 'Your message has been saved and forwarded to Sunil Shukla and Team.');
-        setName('');
-        setEmail('');
-        setPhone('');
-        setSubject('');
-        setMessage('');
-      }
-    } catch {
-      setError('Network error while submitting contact form.');
+      setSubmittedId(data.inquiryId || 'submitted');
+      showToast('Inquiry Sent', 'Your message has been saved and forwarded to Sunil Shukla and Team.');
+      setName('');
+      setEmail('');
+      setPhone('');
+      setSubject('');
+      setMessage('');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to submit inquiry. Please try again.'));
     } finally {
       setSubmitting(false);
     }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { applyImageFallbackOnError } from '../utils/imageFallback';
 
 interface LightboxModalProps {
   images: string[];
@@ -93,6 +94,7 @@ export function LightboxModal({ images, initialIndex, isOpen, title, onClose }: 
             <img
               src={images[currentIndex]}
               alt={`${title} view ${currentIndex + 1}`}
+              onError={(e) => applyImageFallbackOnError(e, title)}
               onClick={() => setZoomed((z) => !z)}
               className={`max-h-[76vh] max-w-[88vw] object-contain rounded-xl transition-transform duration-300 cursor-zoom-in ${
                 zoomed ? 'scale-150 cursor-zoom-out' : 'scale-100'
@@ -128,7 +130,12 @@ export function LightboxModal({ images, initialIndex, isOpen, title, onClose }: 
                     idx === currentIndex ? 'border-[#38BDF8] scale-105' : 'border-white/10 opacity-60 hover:opacity-100'
                   }`}
                 >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img
+                    src={img}
+                    alt={`${title} thumbnail ${idx + 1}`}
+                    onError={(e) => applyImageFallbackOnError(e, title)}
+                    className="w-full h-full object-cover"
+                  />
                 </button>
               ))}
             </div>
