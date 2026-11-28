@@ -265,7 +265,7 @@ export function AuthAndAccountPage() {
               </h1>
               <p className="text-xs sm:text-sm text-[#A1A1AA] mt-1">
                 {authTab === 'login'
-                  ? 'Access your order history, saved shipping addresses, or administrator portal.'
+                  ? 'Access your order history and saved shipping addresses.'
                   : authTab === 'register'
                   ? 'Register for faster checkout and real-time order tracking.'
                   : 'Enter your registered email address and choose a new password.'}
@@ -363,22 +363,6 @@ export function AuthAndAccountPage() {
                   : 'Update Password'}
               </button>
             </form>
-
-            {/* Quick Admin Credentials Info for Testing & Evaluation */}
-            <div className="pt-4 border-t border-white/10 flex items-center justify-between gap-3 text-xs text-[#A1A1AA]">
-              <span>Administrator Access (Sunil Shukla &amp; Team):</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthTab('login');
-                  setEmail('admin@flangecraft.com');
-                  setPassword('FlangeCraft@Admin');
-                }}
-                className="px-3 py-1.5 rounded-lg bg-[#8B5CF6]/20 border border-[#8B5CF6]/40 text-[#F5F5F7] font-medium hover:bg-[#8B5CF6]/30"
-              >
-                Fill Admin Credentials
-              </button>
-            </div>
           </div>
 
           {/* Right: Guest Order Tracking Lookup (5 cols) */}

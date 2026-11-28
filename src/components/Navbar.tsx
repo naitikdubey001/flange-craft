@@ -336,12 +336,14 @@ export function Navbar() {
                   >
                     {user ? `Account (${user.name.split(' ')[0]})` : 'Login / Register'}
                   </Link>
-                  <Link
-                    to="/admin"
-                    className="py-2.5 px-4 rounded-xl bg-[#8B5CF6]/20 border border-[#8B5CF6]/40 text-xs font-medium text-[#F5F5F7]"
-                  >
-                    Admin Dashboard
-                  </Link>
+                  {user?.role === 'admin' && (
+                    <Link
+                      to="/admin"
+                      className="py-2.5 px-4 rounded-xl bg-[#8B5CF6]/20 border border-[#8B5CF6]/40 text-xs font-medium text-[#F5F5F7]"
+                    >
+                      Admin Dashboard
+                    </Link>
+                  )}
                 </div>
               </div>
             </motion.div>

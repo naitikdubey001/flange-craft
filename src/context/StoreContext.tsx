@@ -252,16 +252,48 @@ const DEFAULT_CONFIG: SiteConfig = {
     currency: 'INR',
     currencySymbol: '₹',
     shippingFee: 0,
-    shippingConfigurableNote: 'Calculated based on delivery pin code & order quantity (Configurable in Admin)',
+    shippingConfigurableNote: 'Calculated based on delivery pin code & order quantity',
     taxPercentage: 0,
-    taxConfigurableNote: 'GST as applicable (Configurable in Admin)',
+    taxConfigurableNote: 'GST as applicable',
     razorpayKeyId: ''
   },
   policies: {
-    privacyPolicy: 'Privacy Policy is configurable via the Flange Craft Admin Dashboard.',
-    termsConditions: 'Terms & Conditions are configurable via the Flange Craft Admin Dashboard.',
-    shippingPolicy: 'Shipping Policy is configurable via the Flange Craft Admin Dashboard.',
-    returnPolicy: 'Return Policy is configurable via the Flange Craft Admin Dashboard.'
+    privacyPolicy: `Flange Craft ("we", "our", or "us"), operated by Sunil Shukla and Team, respects your privacy and is committed to protecting the personal data you share when using our website or placing an order.
+
+1. Information We Collect
+We collect only the details necessary to process your signage orders, respond to inquiries, and manage your customer account—including your name, email address, phone number, and shipping address.
+
+2. Payment Security
+All online payment transactions are processed through Razorpay's secure payment gateway architecture with server-side signature verification. We do not store raw card numbers or sensitive banking credentials on our servers.
+
+3. Contact & Privacy Requests
+For questions regarding your account data or order records, please reach out to Sunil Shukla and Team through our Contact page.`,
+    termsConditions: `Welcome to Flange Craft, owned and operated by Sunil Shukla and Team. By accessing this website or placing an order for our illuminated Lollipop Flange signage, you agree to the following terms:
+
+1. Product Catalogue Accuracy
+Flange Craft manufactures and supplies the following verified variants:
+• Standard Lollipop Flange: Round (18 × 18 inches, 24 × 24 inches) and Square (18 × 18 inches, 24 × 24 inches)
+• Rotating Lollipop Flange: Round only (12 × 12 inches, 24 × 24 inches)
+
+2. Pricing & Order Confirmation
+Product prices, taxes, and shipping charges are confirmed at checkout or via official quote. Orders paid online are confirmed only after cryptographic payment verification on our server.
+
+3. Support & Inquiries
+For commercial terms or custom branding inquiries, please contact Sunil Shukla and Team via the Contact page.`,
+    shippingPolicy: `Flange Craft ships illuminated Lollipop Flange signage with protective commercial packaging designed to safeguard acrylic faces, frames, and mounting brackets during transit.
+
+1. Order Processing & Dispatch
+Orders are prepared and inspected prior to dispatch. Estimated dispatch timelines and courier partner details are shared once your order status is updated in your Customer Account.
+
+2. Shipping Coverage & Charges
+Shipping rates and regional delivery timelines are determined based on package dimensions (12 × 12", 18 × 18", or 24 × 24") and delivery destination.`,
+    returnPolicy: `Flange Craft is committed to delivering quality illuminated signage that matches the exact variant and dimensions ordered.
+
+1. Inspection Upon Delivery
+Customers are advised to inspect packaging and signage upon delivery. In case of transit damage or a variant discrepancy, please reach out immediately through our Contact page with your Order ID.
+
+2. Return & Replacement Support
+Our support team will review your order details and guide you through the applicable replacement or resolution process.`
   }
 };
 

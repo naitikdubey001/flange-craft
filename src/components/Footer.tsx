@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
-import { ArrowUpRight, Shield, MapPin, Phone, Mail } from 'lucide-react';
+import { ArrowUpRight, MapPin, Phone, Mail } from 'lucide-react';
 
 export function Footer() {
   const { siteConfig } = useStore();
@@ -148,11 +148,6 @@ export function Footer() {
                   Return Policy
                 </Link>
               </li>
-              <li>
-                <Link to="/admin" className="inline-flex items-center gap-1 text-xs text-[#8B5CF6] hover:text-[#F5F5F7] transition-colors pt-1">
-                  <Shield className="w-3 h-3" /> Admin Portal
-                </Link>
-              </li>
             </ul>
           </div>
 
@@ -166,21 +161,21 @@ export function Footer() {
                 <Phone className="w-4 h-4 text-[#38BDF8] shrink-0 mt-0.5" />
                 <div>
                   <span className="text-[#F5F5F7] font-medium block">Phone / WhatsApp</span>
-                  <span>{contact?.phone || contact?.whatsapp || 'Configurable via Admin Dashboard'}</span>
+                  <span>{contact?.phone || contact?.whatsapp || 'Available upon inquiry'}</span>
                 </div>
               </div>
               <div className="flex items-start gap-2.5">
                 <Mail className="w-4 h-4 text-[#8B5CF6] shrink-0 mt-0.5" />
                 <div>
                   <span className="text-[#F5F5F7] font-medium block">Email</span>
-                  <span>{contact?.email || 'Configurable via Admin Dashboard'}</span>
+                  <span>{contact?.email || 'Submit inquiry via Contact form'}</span>
                 </div>
               </div>
               <div className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-[#38BDF8] shrink-0 mt-0.5" />
                 <div>
                   <span className="text-[#F5F5F7] font-medium block">Business Address</span>
-                  <span>{contact?.address || 'Configurable via Admin Dashboard'}</span>
+                  <span>{contact?.address || 'Shared upon order or inquiry confirmation'}</span>
                 </div>
               </div>
             </div>

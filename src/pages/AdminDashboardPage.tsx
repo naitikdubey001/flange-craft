@@ -37,7 +37,7 @@ export function AdminDashboardPage() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Admin Login Gate state if not authenticated as admin
-  const [adminEmail, setAdminEmail] = useState('admin@flangecraft.com');
+  const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
 
   // Admin Backend Data
@@ -320,6 +320,7 @@ export function AdminDashboardPage() {
                 required
                 value={adminEmail}
                 onChange={(e) => setAdminEmail(e.target.value)}
+                placeholder="Enter administrator email"
                 className="w-full px-4 py-3 rounded-xl bg-[#1A1C22] border border-white/10 text-sm text-[#F5F5F7]"
               />
             </div>
@@ -342,20 +343,6 @@ export function AdminDashboardPage() {
               Authenticate Administrator
             </button>
           </form>
-
-          <div className="pt-4 border-t border-white/10 flex items-center justify-between text-xs text-[#A1A1AA]">
-            <span>Default Admin (Sunil Shukla &amp; Team):</span>
-            <button
-              type="button"
-              onClick={() => {
-                setAdminEmail('admin@flangecraft.com');
-                setAdminPassword('FlangeCraft@Admin');
-              }}
-              className="px-3 py-1.5 rounded-lg bg-[#8B5CF6]/20 border border-[#8B5CF6]/40 text-[#F5F5F7] font-medium"
-            >
-              Auto-Fill Admin Login
-            </button>
-          </div>
         </div>
       </div>
     );

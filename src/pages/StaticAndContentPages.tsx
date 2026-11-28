@@ -11,7 +11,6 @@ import {
   AlertCircle,
   Search,
   ChevronDown,
-  Shield,
   Layers,
   RotateCw,
   Sun,
@@ -304,7 +303,7 @@ export function ContactPage() {
                   <div>
                     <div className="font-semibold text-[#F5F5F7]">Phone</div>
                     <div className="text-[#A1A1AA] mt-0.5">
-                      {contact?.phone || 'Not yet configured — Set in Admin Dashboard'}
+                      {contact?.phone || 'Available upon request via inquiry form'}
                     </div>
                   </div>
                 </div>
@@ -314,7 +313,7 @@ export function ContactPage() {
                   <div>
                     <div className="font-semibold text-[#F5F5F7]">WhatsApp</div>
                     <div className="text-[#A1A1AA] mt-0.5">
-                      {contact?.whatsapp || 'Not yet configured — Set in Admin Dashboard'}
+                      {contact?.whatsapp || 'Available upon request via inquiry form'}
                     </div>
                   </div>
                 </div>
@@ -324,7 +323,7 @@ export function ContactPage() {
                   <div>
                     <div className="font-semibold text-[#F5F5F7]">Email</div>
                     <div className="text-[#A1A1AA] mt-0.5">
-                      {contact?.email || 'Not yet configured — Set in Admin Dashboard'}
+                      {contact?.email || 'Use the inquiry form to reach our support team directly'}
                     </div>
                   </div>
                 </div>
@@ -334,17 +333,10 @@ export function ContactPage() {
                   <div>
                     <div className="font-semibold text-[#F5F5F7]">Business Address</div>
                     <div className="text-[#A1A1AA] mt-0.5">
-                      {contact?.address || 'Not yet configured — Set in Admin Dashboard'}
+                      {contact?.address || 'Shared upon order or inquiry confirmation'}
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs text-[#A1A1AA]">
-                <span>Social Media &amp; Contact Config</span>
-                <Link to="/admin" className="text-[#38BDF8] hover:underline inline-flex items-center gap-1">
-                  <Shield className="w-3.5 h-3.5" /> Configure in Admin
-                </Link>
               </div>
             </div>
           </div>
@@ -620,18 +612,12 @@ export function PolicyPage({
         <div className="pb-8 border-b border-white/[0.08] flex flex-wrap items-end justify-between gap-4">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#38BDF8] mb-2">
-              Store Policy • Configurable Business Information
+              Store Policy • Official Guidelines
             </div>
             <h1 className="font-display text-3xl sm:text-5xl font-bold text-[#F5F5F7]">
               {meta.title}
             </h1>
           </div>
-          <Link
-            to="/admin"
-            className="px-3.5 py-2 rounded-xl bg-[#111318] border border-white/10 text-xs text-[#A1A1AA] hover:text-[#F5F5F7] inline-flex items-center gap-1.5"
-          >
-            <Shield className="w-3.5 h-3.5 text-[#8B5CF6]" /> Edit Policy in Admin
-          </Link>
         </div>
 
         <div className="p-8 sm:p-10 rounded-3xl bg-[#111318] border border-white/10">

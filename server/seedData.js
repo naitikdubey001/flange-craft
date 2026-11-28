@@ -261,9 +261,9 @@ export const INITIAL_SITE_CONFIG = {
     currency: 'INR',
     currencySymbol: '₹',
     shippingFee: 0,
-    shippingConfigurableNote: 'Calculated based on delivery pin code & order quantity (Configurable in Admin)',
+    shippingConfigurableNote: 'Calculated based on delivery pin code & order quantity',
     taxPercentage: 0,
-    taxConfigurableNote: 'GST as applicable (Configurable in Admin)',
+    taxConfigurableNote: 'GST as applicable',
     razorpayKeyId: ''
   },
   policies: {
@@ -275,8 +275,8 @@ We collect only the details necessary to process your signage orders, respond to
 2. Payment Security
 All online payment transactions are processed through Razorpay's secure payment gateway architecture with server-side signature verification. We do not store raw card numbers or sensitive banking credentials on our servers.
 
-3. Configurable Business Policy Details
-Specific data retention schedules, third-party logistics disclosures, and regional compliance clauses are configurable by the business administrator via the Flange Craft Admin Dashboard.`,
+3. Contact & Privacy Requests
+For questions regarding your account data or order records, please reach out to Sunil Shukla and Team through our Contact page.`,
     termsConditions: `Welcome to Flange Craft, owned and operated by Sunil Shukla and Team. By accessing this website or placing an order for our illuminated Lollipop Flange signage, you agree to the following terms:
 
 1. Product Catalogue Accuracy
@@ -285,24 +285,24 @@ Flange Craft manufactures and supplies the following verified variants:
 • Rotating Lollipop Flange: Round only (12 × 12 inches, 24 × 24 inches)
 
 2. Pricing & Order Confirmation
-Product prices, taxes, and shipping charges are managed through the store configuration. Orders paid online are confirmed only after cryptographic payment verification on our server.
+Product prices, taxes, and shipping charges are confirmed at checkout or via official quote. Orders paid online are confirmed only after cryptographic payment verification on our server.
 
-3. Configurable Legal Terms
-Additional commercial terms, jurisdiction details, and custom branding artwork submission rules can be updated by the administrator in the Admin Dashboard.`,
+3. Support & Inquiries
+For commercial terms or custom branding inquiries, please contact Sunil Shukla and Team via the Contact page.`,
     shippingPolicy: `Flange Craft ships illuminated Lollipop Flange signage with protective commercial packaging designed to safeguard acrylic faces, frames, and mounting brackets during transit.
 
 1. Order Processing & Dispatch
 Orders are prepared and inspected prior to dispatch. Estimated dispatch timelines and courier partner details are shared once your order status is updated in your Customer Account.
 
 2. Shipping Coverage & Charges
-Shipping rates and regional delivery timelines are configurable by Sunil Shukla and Team in the Admin Dashboard based on package dimensions (12 × 12", 18 × 18", or 24 × 24") and destination.`,
+Shipping rates and regional delivery timelines are determined based on package dimensions (12 × 12", 18 × 18", or 24 × 24") and delivery destination.`,
     returnPolicy: `Flange Craft is committed to delivering quality illuminated signage that matches the exact variant and dimensions ordered.
 
 1. Inspection Upon Delivery
 Customers are advised to inspect packaging and signage upon delivery. In case of transit damage or a variant discrepancy, please reach out immediately through our Contact page with your Order ID.
 
-2. Return & Replacement Terms
-Specific return eligibility windows, replacement procedures, and refund processing timelines are configurable by Sunil Shukla and Team in the Admin Dashboard.`
+2. Return & Replacement Support
+Our support team will review your order details and guide you through the applicable replacement or resolution process.`
   }
 };
 
